@@ -26,9 +26,8 @@ db.connect((err) => {
     console.log('Connected to MySQL database.');
 });
 
-// ---------------------------
+
 // Channel Management Routes
-// ---------------------------
 
 // Get all channels
 app.get('/api/channels', (req, res) => {
@@ -41,6 +40,9 @@ app.get('/api/channels', (req, res) => {
 // Create a new channel
 app.post('/api/channels', (req, res) => {
     const { name, status = 1 } = req.body; // Default active status
+    if (status === 0) {
+        return res.status(400).json({ message: 'Cannot create an inactive channel.' });
+    }
     db.query('INSERT INTO channels (name, status) VALUES (?, ?)', [name, status], (err, result) => {
         if (err) return res.status(500).json(err);
         res.status(201).json({ id: result.insertId, name, status });
@@ -66,9 +68,16 @@ app.delete('/api/channels/:id', (req, res) => {
     });
 });
 
-// ---------------------------
+// Get the count of active channels
+app.get('/api/channels/count', (req, res) => {
+    db.query('SELECT COUNT(*) AS count FROM channels WHERE status = 1', (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json({ count: results[0].count });
+    });
+});
+
+
 // Type Management Routes
-// ---------------------------
 
 // Get all types
 app.get('/api/types', (req, res) => {
@@ -106,9 +115,9 @@ app.delete('/api/types/:id', (req, res) => {
     });
 });
 
-// ---------------------------
+
 // Category Management Routes
-// ---------------------------
+ 
 
 // Get all categories
 app.get('/api/categories', (req, res) => {
@@ -146,9 +155,7 @@ app.delete('/api/categories/:id', (req, res) => {
     });
 });
 
-// ---------------------------
 // Program Management Routes
-// ---------------------------
 
 // Get all programs
 app.get('/api/programs', (req, res) => {
@@ -171,10 +178,16 @@ app.get('/api/programs/:id', (req, res) => {
 // Create a new program
 app.post('/api/programs', (req, res) => {
     const { title, duration, description, typeId, channelId, categoryId, status = 1 } = req.body; // Default active status
-    db.query('INSERT INTO programs (title, duration, description, typeId, channelId, categoryId, status) VALUES (?, ?, ?, ?, ?, ?, ?)', 
-             [title, duration, description, typeId, channelId, categoryId, status], (err, result) => {
+    db.query('SELECT status FROM channels WHERE id = ?', [channelId], (err, results) => {
         if (err) return res.status(500).json(err);
-        res.status(201).json({ id: result.insertId, title, status });
+        if (results.length === 0 || results[0].status === 0) {
+            return res.status(400).json({ message: 'Cannot create a program with an inactive channel.' });
+        }
+        db.query('INSERT INTO programs (title, duration, description, typeId, channelId, categoryId, status) VALUES (?, ?, ?, ?, ?, ?, ?)', 
+                 [title, duration, description, typeId, channelId, categoryId, status], (err, result) => {
+            if (err) return res.status(500).json(err);
+            res.status(201).json({ id: result.insertId, title, status });
+        });
     });
 });
 
@@ -195,6 +208,56 @@ app.delete('/api/programs/:id', (req, res) => {
     db.query('DELETE FROM programs WHERE id = ?', [id], (err) => {
         if (err) return res.status(500).json(err);
         res.sendStatus(204);
+    });
+});
+
+// Get program count
+app.get('/api/programs/count', (req, res) => {
+    db.query('SELECT COUNT(*) AS count FROM programs', (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json({ count: results[0].count });
+    });
+});
+
+// Get channel count (active only)
+app.get('/api/channels/count', (req, res) => {
+    db.query('SELECT COUNT(*) AS count FROM channels WHERE status = 1', (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json({ count: results[0].count });
+    });
+});
+
+
+// User Login Route
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Validate input
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required.' });
+    }
+
+    // Check if username exists
+    db.query('SELECT * FROM login WHERE username = ?', [username], (err, results) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ message: 'Server error.' });
+        }
+        
+        // If user not found
+        if (results.length === 0) {
+            return res.status(401).json({ message: 'Invalid username or password.' });
+        }
+
+        const user = results[0];
+
+        // Compare password (assuming passwords are hashed)
+        if (user.password !== password) { // In production, use a secure comparison method
+            return res.status(401).json({ message: 'Invalid username or password.' });
+        }
+
+        // Successful login
+        res.json({ message: 'Login successful', userId: user.id });
     });
 });
 
