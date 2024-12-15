@@ -205,7 +205,7 @@ app.put('/api/programs/:id', (req, res) => {
 // Delete a program
 app.delete('/api/programs/:id', (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM programs WHERE id = ?', [id], (err) => {
+    db.query('DELETE FROM programs ', [id], (err) => {
         if (err) return res.status(500).json(err);
         res.sendStatus(204);
     });
@@ -213,9 +213,14 @@ app.delete('/api/programs/:id', (req, res) => {
 
 // Get program count
 app.get('/api/programs/count', (req, res) => {
-    db.query('SELECT COUNT(*) AS count FROM programs', (err, results) => {
-        if (err) return res.status(500).json(err);
-        res.json({ count: results[0].count });
+    db.query('SELECT COUNT(*) AS count FROM programs WHERE status = 1', (err, results) => {
+        if (err) {
+            console.error('Error executing query:', err);
+            return res.status(500).json({ error: 'Database query error' });
+        }
+        // Ensure results have data
+        const count = results.length > 0 ? results[0].count : 0;
+        res.json({ count });
     });
 });
 
