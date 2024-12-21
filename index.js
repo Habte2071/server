@@ -2,10 +2,10 @@ const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-
+const bcrypt = require('bcryptjs');
 const app = express();
 const port = 3001;
-
+const jwt = require('jsonwebtoken');
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
@@ -202,12 +202,38 @@ app.put('/api/programs/:id', (req, res) => {
     });
 });
 
+// // Delete a program
+// app.delete('/api/programs/:id', (req, res) => {
+//     const { id } = req.params;
+//     db.query('DELETE FROM programs ', [id], (err) => {
+//         if (err) return res.status(500).json(err);
+//         res.sendStatus(204);
+//     });
+// });
+
 // Delete a program
 app.delete('/api/programs/:id', (req, res) => {
     const { id } = req.params;
-    db.query('DELETE FROM programs ', [id], (err) => {
-        if (err) return res.status(500).json(err);
-        res.sendStatus(204);
+
+    // Ensure that the ID is provided
+    if (!id) {
+        return res.status(400).json({ error: 'Program ID is required' });
+    }
+
+    // Correct SQL query to delete a specific program
+    db.query('DELETE FROM programs WHERE id = ?', [id], (err, results) => {
+        if (err) {
+            console.error('Error executing delete query:', err);
+            return res.status(500).json({ error: 'Failed to delete program' });
+        }
+
+        // Check if any rows were affected
+        if (results.affectedRows === 0) {
+            return res.status(404).json({ error: 'Program not found' });
+        }
+
+        // Successfully deleted
+        res.sendStatus(204); // No Content
     });
 });
 
@@ -232,39 +258,102 @@ app.get('/api/channels/count', (req, res) => {
     });
 });
 
+const SECRET_KEY = '3x@mpl3K3y$D0nT$h@r3!'; // Change this to a strong secret key
 
-// User Login Route
-app.post('/api/login', (req, res) => {
+// // User Login Route
+// app.post('/api/login', (req, res) => {
+//     const { username, password } = req.body;
+
+//     // Validate input
+//     if (!username || !password) {
+//         return res.status(400).json({ message: 'Username and password are required.' });
+//     }
+
+//     // Check if username exists
+//     db.query('SELECT * FROM login WHERE username = ?', [username], (err, results) => {
+//         if (err) {
+//             console.error(err);
+//             return res.status(500).json({ message: 'Server error.' });
+//         }
+        
+//         // If user not found
+//         if (results.length === 0) {
+//             return res.status(401).json({ message: 'Invalid username or password.' });
+//         }
+
+//         const user = results[0];
+
+//         // Compare password (assuming passwords are hashed)
+//         if (user.password !== password) { // In production, use a secure comparison method
+//             return res.status(401).json({ message: 'Invalid username or password.' });
+//         }
+
+//         // Successful login
+//         res.json({ message: 'Login successful', userId: user.id });
+//     });
+// });
+
+app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
-    // Validate input
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required.' });
-    }
-
-    // Check if username exists
-    db.query('SELECT * FROM login WHERE username = ?', [username], (err, results) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: 'Server error.' });
-        }
-        
-        // If user not found
+    db.query('SELECT * FROM login WHERE username = ?', [username], async (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
         if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid username or password.' });
+            console.log('No user found with that username'); // Debugging line
+            return res.status(401).json({ error: 'Invalid username or password' });
         }
 
         const user = results[0];
+        console.log('Retrieved user:', user); // Debugging line
 
-        // Compare password (assuming passwords are hashed)
-        if (user.password !== password) { // In production, use a secure comparison method
-            return res.status(401).json({ message: 'Invalid username or password.' });
+        const isMatch = await bcrypt.compare(password, user.password);
+        console.log('Password match result:', isMatch); // Debugging line
+
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Invalid username or password' });
         }
 
-        // Successful login
-        res.json({ message: 'Login successful', userId: user.id });
+        const token = jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, { expiresIn: '1h' });
+        res.json({ token });
     });
 });
+
+
+
+
+
+
+
+
+
+// User Registration Route
+app.post('/api/register', async (req, res) => {
+    const { username, password, firstname, lastname, email, phone, role, department } = req.body;
+
+    // Validate required fields
+    if (!username || !password || !firstname || !lastname || !email || !phone || !role || !department) {
+        return res.status(400).json({ message: 'All fields are required.' });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Insert user data into the database
+    db.query(
+        'INSERT INTO login (username, password, firstname, lastname, email, phone, role, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [username, hashedPassword, firstname, lastname, email, phone, role, department],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ message: 'User registered successfully' });
+        }
+    );
+});
+
+
+
+
+
+
 
 // Start the server
 app.listen(port, () => {
