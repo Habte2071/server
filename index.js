@@ -6,15 +6,15 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const port = 3001;
 const jwt = require('jsonwebtoken');
-// Middleware
+
+
+
 app.use(cors());
 app.use(bodyParser.json());
-
-// MySQL Connection
 const db = mysql.createConnection({
     host: 'localhost',
-    user: 'root', // Default user for XAMPP
-    password: '', // Default password is empty
+    user: 'root', 
+    password: '', 
     database: 'television_networks'
 });
 
@@ -27,7 +27,6 @@ db.connect((err) => {
 });
 
 
-// Channel Management Routes
 
 // Get all channels
 app.get('/api/channels', (req, res) => {
@@ -39,7 +38,7 @@ app.get('/api/channels', (req, res) => {
 
 // Create a new channel
 app.post('/api/channels', (req, res) => {
-    const { name, status = 1 } = req.body; // Default active status
+    const { name, status = 1 } = req.body; 
     if (status === 0) {
         return res.status(400).json({ message: 'Cannot create an inactive channel.' });
     }
@@ -77,7 +76,6 @@ app.get('/api/channels/count', (req, res) => {
 });
 
 
-// Type Management Routes
 
 // Get all types
 app.get('/api/types', (req, res) => {
@@ -115,10 +113,6 @@ app.delete('/api/types/:id', (req, res) => {
     });
 });
 
-
-// Category Management Routes
- 
-
 // Get all categories
 app.get('/api/categories', (req, res) => {
     db.query('SELECT * FROM categories', (err, results) => {
@@ -155,7 +149,6 @@ app.delete('/api/categories/:id', (req, res) => {
     });
 });
 
-// Program Management Routes
 
 // Get all programs
 app.get('/api/programs', (req, res) => {
@@ -177,7 +170,7 @@ app.get('/api/programs/:id', (req, res) => {
 
 // Create a new program
 app.post('/api/programs', (req, res) => {
-    const { title, duration, description, typeId, channelId, categoryId, status = 1 } = req.body; // Default active status
+    const { title, duration, description, typeId, channelId, categoryId, status = 1 } = req.body;
     db.query('SELECT status FROM channels WHERE id = ?', [channelId], (err, results) => {
         if (err) return res.status(500).json(err);
         if (results.length === 0 || results[0].status === 0) {
@@ -202,38 +195,27 @@ app.put('/api/programs/:id', (req, res) => {
     });
 });
 
-// // Delete a program
-// app.delete('/api/programs/:id', (req, res) => {
-//     const { id } = req.params;
-//     db.query('DELETE FROM programs ', [id], (err) => {
-//         if (err) return res.status(500).json(err);
-//         res.sendStatus(204);
-//     });
-// });
+
 
 // Delete a program
 app.delete('/api/programs/:id', (req, res) => {
     const { id } = req.params;
 
-    // Ensure that the ID is provided
     if (!id) {
         return res.status(400).json({ error: 'Program ID is required' });
     }
 
-    // Correct SQL query to delete a specific program
     db.query('DELETE FROM programs WHERE id = ?', [id], (err, results) => {
         if (err) {
             console.error('Error executing delete query:', err);
             return res.status(500).json({ error: 'Failed to delete program' });
         }
 
-        // Check if any rows were affected
         if (results.affectedRows === 0) {
             return res.status(404).json({ error: 'Program not found' });
         }
 
-        // Successfully deleted
-        res.sendStatus(204); // No Content
+        res.sendStatus(204); 
     });
 });
 
@@ -244,13 +226,12 @@ app.get('/api/programs/count', (req, res) => {
             console.error('Error executing query:', err);
             return res.status(500).json({ error: 'Database query error' });
         }
-        // Ensure results have data
         const count = results.length > 0 ? results[0].count : 0;
         res.json({ count });
     });
 });
 
-// Get channel count (active only)
+
 app.get('/api/channels/count', (req, res) => {
     db.query('SELECT COUNT(*) AS count FROM channels WHERE status = 1', (err, results) => {
         if (err) return res.status(500).json(err);
@@ -258,56 +239,22 @@ app.get('/api/channels/count', (req, res) => {
     });
 });
 
-const SECRET_KEY = '3x@mpl3K3y$D0nT$h@r3!'; // Change this to a strong secret key
-
-// // User Login Route
-// app.post('/api/login', (req, res) => {
-//     const { username, password } = req.body;
-
-//     // Validate input
-//     if (!username || !password) {
-//         return res.status(400).json({ message: 'Username and password are required.' });
-//     }
-
-//     // Check if username exists
-//     db.query('SELECT * FROM login WHERE username = ?', [username], (err, results) => {
-//         if (err) {
-//             console.error(err);
-//             return res.status(500).json({ message: 'Server error.' });
-//         }
-        
-//         // If user not found
-//         if (results.length === 0) {
-//             return res.status(401).json({ message: 'Invalid username or password.' });
-//         }
-
-//         const user = results[0];
-
-//         // Compare password (assuming passwords are hashed)
-//         if (user.password !== password) { // In production, use a secure comparison method
-//             return res.status(401).json({ message: 'Invalid username or password.' });
-//         }
-
-//         // Successful login
-//         res.json({ message: 'Login successful', userId: user.id });
-//     });
-// });
-
+const SECRET_KEY = '3x@mpl3K3y$D0nT$h@r3!';
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
 
     db.query('SELECT * FROM login WHERE username = ?', [username], async (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         if (results.length === 0) {
-            console.log('No user found with that username'); // Debugging line
+            console.log('No user found with that username'); 
             return res.status(401).json({ error: 'Invalid username or password' });
         }
 
         const user = results[0];
-        console.log('Retrieved user:', user); // Debugging line
+        console.log('Retrieved user:', user); 
 
         const isMatch = await bcrypt.compare(password, user.password);
-        console.log('Password match result:', isMatch); // Debugging line
+        console.log('Password match result:', isMatch); 
 
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid username or password' });
@@ -326,19 +273,14 @@ app.post('/api/login', async (req, res) => {
 
 
 
-// User Registration Route
 app.post('/api/register', async (req, res) => {
     const { username, password, firstname, lastname, email, phone, role, department } = req.body;
 
-    // Validate required fields
     if (!username || !password || !firstname || !lastname || !email || !phone || !role || !department) {
         return res.status(400).json({ message: 'All fields are required.' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Insert user data into the database
     db.query(
         'INSERT INTO login (username, password, firstname, lastname, email, phone, role, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [username, hashedPassword, firstname, lastname, email, phone, role, department],
@@ -352,10 +294,58 @@ app.post('/api/register', async (req, res) => {
 
 
 
+// Search channels by name
+app.get('/api/channels/search', (req, res) => {
+    const search = req.query.name; // Get the search term from query parameters
+    const sql = 'SELECT * FROM channels WHERE name LIKE ?';
+    const params = [`%${search}%`]; // Use wildcards for partial matches
+
+    db.query(sql, params, (err, results) => {
+        if (err) {
+            console.error("Database query error:", err); // Log any errors
+            return res.status(500).json({ error: "Database query error" });
+        }
+        res.json(results); // Send the results as JSON
+    });
+});
 
 
 
-// Start the server
+
+// Get channels with pagination
+app.get('/api/channels', (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1); // Ensure page is at least 1
+    const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 10), 100); // Limit between 1 and 100
+    const offset = (page - 1) * limit;
+
+    // Main query to fetch paginated channels
+    const query = 'SELECT * FROM channels LIMIT ? OFFSET ?';
+    db.query(query, [limit, offset], (err, results) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: "Failed to fetch channels.", details: err });
+        }
+
+        // Count total channels
+        db.query('SELECT COUNT(*) AS total FROM channels', (err, countResults) => {
+            if (err) {
+                return res.status(500).json({ success: false, error: "Failed to fetch channel count.", details: err });
+            }
+
+            const totalChannels = countResults[0].total;
+            const totalPages = Math.ceil(totalChannels / limit);
+
+            res.json({
+                success: true,
+                data: {
+                    page,
+                    totalPages,
+                    totalChannels,
+                    channels: results,
+                },
+            });
+        });
+    });
+});
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });
